@@ -1,0 +1,42 @@
+version: '3.2'
+
+services:
+  reverse:
+    container_name: reverse
+    restart: "unless-stopped"
+    hostname: reverse
+    image: nginx:alpine
+    networks:
+      - reverse
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./data/nginx/:/etc/nginx
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+      - ./data/nginx/logs:/var/log/nginx
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+
+  certbot:
+    restart: "unless-stopped"
+    container_name: certbot
+    image: certbot/certbot:latest
+    volumes:
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+
+networks:
+  reverse:
+    attachable: true
